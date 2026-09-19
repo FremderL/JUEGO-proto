@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Desolate Land — Sobrevive al Horror</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- MENU -->
+  <div id="menu">
+    <div class="menu-bg-grid"></div>
+    <div class="menu-content">
+      <div class="game-title">DESOLATE LAND</div>
+      <div class="subtitle">Un mundo devorado — Solo quedan ecos</div>
+      <div class="menu-divider"></div>
+      <p class="menu-desc">
+        Extrañas criaturas lo devoraron todo. Solo queda la <strong>nada</strong>, tu silueta blanca y un arma.
+        Sobrevive <strong>10 oleadas</strong> de horror: <em style="color:#fff;">arañas</em> veloces,
+        <em style="color:#9be564;">reptiles</em> de cola segmentada y el <em style="color:#ff6e4a;">dragón</em> final.
+        Sube de nivel, elige tu camino y descubre qué se esconde tras el borde del mundo.
+      </p>
+      <div class="menu-actions">
+        <button class="btn-primary" id="playBtn">▶&nbsp; Entrar al Vacío</button>
+        <button class="btn-ghost" id="howBtn">Cómo jugar</button>
+      </div>
+      <p style="margin-top:14px; font-family:'JetBrains Mono',monospace; font-size:10px; color:rgba(255,255,255,0.32); letter-spacing:0.1em;">
+        W A S D / Flechas para moverte · Ratón para apuntar · Click para disparar · R recargar · E curarte
+      </p>
+    </div>
+    <div class="menu-footer">
+      <span><i class="dot"></i> HEART SYSTEM</span>
+      <span style="opacity:0.35;">·</span>
+      <span>GHOST CARD VER. 1.0</span>
+      <span style="opacity:0.35;">·</span>
+      <span>10 OLEADAS</span>
+    </div>
+  </div>
+
+  <!-- HEART INTRO -->
+  <div id="heartIntro" class="hidden">
+    <canvas id="heartCanvas"></canvas>
+    <div class="heart-text" id="heartText">
+      <div class="heart-line" id="heartLine1">Estoy ... ¿vivo?</div>
+      <div class="heart-sub" id="heartSub">escucha tu corazón</div>
+    </div>
+    <button class="heart-skip" id="skipHeart">Saltar ›</button>
+  </div>
+
+  <!-- GHOST OVERLAY (intro / wave / outro) -->
+  <div id="ghostOverlay" class="hidden">
+    <div class="ghost-card-wrap" id="ghostWrap">
+      <div class="ghost-card" id="ghostCard">
+        <div class="card-header">
+          <span class="card-title" id="cardTitle">Entre el velo y la nada</span>
+          <div class="card-gems"><span class="gem"></span><span class="gem"></span><span class="gem"></span></div>
+        </div>
+        <div class="card-art">
+          <div class="skull-wrap">
+            <!-- Stylized skull inline SVG mimicking ghost card bloom -->
+            <svg class="skull-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="g1" cx="50%" cy="40%" r="60%">
+                  <stop offset="0%" stop-color="#E9A6FF" stop-opacity="0.95"/>
+                  <stop offset="45%" stop-color="#C551F5" stop-opacity="0.9"/>
+                  <stop offset="100%" stop-color="#3A0A6A" stop-opacity="1"/>
+                </radialGradient>
+                <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feComposite in="SourceGraphic" in2="blur" operator="over"/></filter>
+              </defs>
+              <!-- skull shape -->
+              <ellipse cx="100" cy="96" rx="52" ry="58" fill="url(#g1)" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+              <!-- eye sockets -->
+              <ellipse cx="81" cy="95" rx="14" ry="18" fill="#020205" stroke="#00E5FF" stroke-width="1.2" opacity="0.95"/>
+              <ellipse cx="119" cy="95" rx="14" ry="18" fill="#020205" stroke="#00E5FF" stroke-width="1.2" opacity="0.95"/>
+              <circle cx="81" cy="96" r="4.5" fill="#00E5FF" opacity="0.95" style="filter:drop-shadow(0 0 6px #00E5FF)"/>
+              <circle cx="119" cy="96" r="4.5" fill="#00E5FF" opacity="0.95" style="filter:drop-shadow(0 0 6px #00E5FF)"/>
+              <!-- nasal -->
+              <path d="M100 108 L94 124 L106 124 Z" fill="#020205" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+              <!-- teeth -->
+              <rect x="78" y="128" width="44" height="14" rx="3" fill="#0a0a0f" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+              <line x1="88" y1="128" x2="88" y2="142" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+              <line x1="100" y1="128" x2="100" y2="142" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+              <line x1="112" y1="128" x2="112" y2="142" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+              <!-- cracks/halo -->
+              <ellipse cx="100" cy="96" rx="64" ry="70" stroke="rgba(197,81,245,0.14)" stroke-width="1" fill="none" stroke-dasharray="4 6"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card-text">
+          <div class="card-dialog" id="cardDialog">...</div>
+          <button class="card-next" id="cardNext">Continuar →</button>
+        </div>
+        <div class="card-progress" id="cardProgress"></div>
+        <div class="crack-overlay" id="crackOverlay"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="gameContainer" class="hidden">
+    <canvas id="gameCanvas"></canvas>
+    <div id="damageFlash"></div>
+    <div id="levelToast">¡NIVEL ALCANZADO! +1 PUNTO</div>
+    <div id="waveBanner" class="hidden">
+      <div class="wave-banner-inner">
+        <div class="wave-label">Oleada</div>
+        <div class="wave-number" id="waveNumber">1</div>
+        <div class="wave-enemies" id="waveEnemies">8 × Arañas</div>
+      </div>
+    </div>
+    <div id="hud">
+      <div class="hud-top">
+        <div class="hud-panel hud-left">
+          <div class="health-row">
+            <span class="health-label">Vida</span>
+            <div class="health-bar"><div class="health-fill" id="healthFill" style="width:100%"></div></div>
+            <span class="health-value" id="healthValue">100 / 100</span>
+          </div>
+          <div class="ammo-row">
+            <span class="health-label">Munición</span>
+            <div class="ammo-dots" id="ammoDots"></div>
+            <span class="ammo-info" id="ammoInfo">12 / 12</span>
+          </div>
+        </div>
+        <div class="hud-panel hud-center">
+          <div class="wave-badge"><span class="pulse"></span> Oleada <span id="hudWave">1</span> / 10</div>
+          <div class="xp-bar-wrap">
+            <div class="xp-label"><span>Nivel <b id="hudLevel">1</b></span><span id="hudXp">0 / 100 XP</span></div>
+            <div class="xp-bar"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="hud-panel hud-right">
+          <div class="stat-mini">Enemigos: <span id="hudEnemies">0</span></div>
+          <div class="stat-mini">Eliminados: <span id="hudKills">0</span></div>
+          <div class="stat-mini">Puntos: <span id="hudPoints">0</span></div>
+        </div>
+      </div>
+      <div class="hud-bottom">
+        <div class="controls-hint">
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Mouse</kbd> apuntar</div>
+          <div><kbd>Click</kbd> disparar · <kbd>R</kbd> recargar · <kbd>E</kbd> curar · <kbd>P</kbd> pausa</div>
+        </div>
+        <div class="action-buttons">
+          <div class="btn-wrap">
+            <button class="action-btn heal" id="healBtn"><span class="icon">✦</span><span>Curar</span></button>
+          </div>
+          <div class="btn-wrap">
+            <button class="action-btn" id="reloadBtn"><span class="icon">↻</span><span>Recargar</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="joystick">
+      <div class="joy-base"></div>
+      <div class="joy-stick" id="joyStick"></div>
+    </div>
+  </div>
+
+  <!-- UPGRADE -->
+  <div id="upgradeScreen" class="hidden">
+    <div class="upgrade-panel">
+      <div class="upgrade-head">
+        <div class="upgrade-title">El Vacío te Fortalece</div>
+        <div class="upgrade-sub">Asciendes. Elige cómo quieres sobrevivir.</div>
+        <div class="points-badge"><span class="dot"></span> <span id="pointsValue">1</span> PUNTOS DISPONIBLES</div>
+      </div>
+      <div class="upgrade-grid" id="upgradeGrid"></div>
+      <div class="upgrade-foot">
+        <button class="btn-primary btn-continue" id="continueBtn">Continuar Oleada →</button>
+        <div style="margin-top:10px; font-family:'JetBrains Mono',monospace; font-size:10px; color:rgba(255,255,255,0.35);">Puedes guardar puntos para la siguiente subida de nivel</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAUSE -->
+  <div id="pauseScreen" class="hidden">
+    <div class="upgrade-panel" style="max-width:420px; text-align:center;">
+      <div class="upgrade-title">Pausa</div>
+      <div class="upgrade-sub">El mundo espera inmóvil</div>
+      <div style="display:flex; gap:12px; justify-content:center; margin-top:22px;">
+        <button class="btn-primary" id="resumeBtn">Reanudar</button>
+        <button class="btn-ghost" id="quitBtn">Abandonar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREDITS -->
+  <div id="creditsScreen" class="hidden">
+    <div class="credits-inner" id="creditsInner"></div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
