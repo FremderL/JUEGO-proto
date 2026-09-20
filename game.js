@@ -167,42 +167,95 @@
     let i=0;
     clearInterval(typeInterval);
     cardNext.style.opacity='0.35'; cardNext.style.pointerEvents='none';
+    cardNext.disabled = true;
+    cardNext.style.cursor='default';
     typeInterval = setInterval(()=>{
       if(i<=text.length){
         cardDialog.innerHTML = typewriterHTML(text.slice(0,i));
         i++;
       } else {
         clearInterval(typeInterval);
-        cardNext.style.opacity='1'; cardNext.style.pointerEvents='auto';
-        cardNext.textContent = idx===ghostQueue.length-1 ? (ghostOverlay.dataset.final==='true'?'Cerrar →':'Continuar →') : 'Continuar →';
+        enableCardNext(idx);
       }
     }, 22);
-    // click to skip typing
+    // Fallback: habilitar botón aunque el typewriter falle — 1s máximo
+    setTimeout(()=>{ if(cardNext.disabled) enableCardNext(idx); }, 1200);
+    function enableCardNext(idx){
+      clearInterval(typeInterval);
+      cardNext.style.opacity='1'; cardNext.style.pointerEvents='auto';
+      cardNext.disabled = false;
+      cardNext.style.cursor='pointer';
+      cardNext.textContent = idx===ghostQueue.length-1 ? (ghostOverlay.dataset.final==='true'?'Cerrar →':'Continuar →') : 'Continuar →';
+      cardNext.style.transform='scale(1.02)';
+      setTimeout(()=> cardNext.style.transform='', 150);
+    }
+    // click en diálogo para saltar tipeo
     cardDialog.onclick=()=>{
       if(i < text.length){
         clearInterval(typeInterval);
         cardDialog.innerHTML = typewriterHTML(text);
         i=text.length+1;
-        cardNext.style.opacity='1'; cardNext.style.pointerEvents='auto';
+        enableCardNext(idx);
       }
     };
+    cardDialog.style.cursor='pointer';
   }
   function typewriterHTML(str){
     // simple escape + em for keywords
     return str.replace(/</g,'&lt;').replace(/—/g,'—');
   }
-  cardNext.addEventListener('click', ()=>{
+  let ghostAdvancing=false;
+  function advanceGhost(){
+    if(ghostAdvancing) return;
+    // si aún está escribiendo, saltar al final en lugar de avanzar
+    if(cardNext.disabled){
+      cardDialog.click();
+      return;
+    }
+    ghostAdvancing=true;
+    setTimeout(()=> ghostAdvancing=false, 300);
     if(ghostIndex < ghostQueue.length-1){
       ghostIndex++;
       showGhostLine(ghostIndex);
     } else {
-      // finish sequence
       clearInterval(typeInterval);
       if(ghostOverlay.dataset.crack==='true'){
         doCrack().then(()=> hideGhost());
       } else {
         hideGhost();
       }
+    }
+  }
+  cardNext.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    advanceGhost();
+  });
+  // Click en toda la carta avanza (excepto si es selección)
+  ghostWrap.addEventListener('click', (e)=>{
+    // si el click fue en el botón ya se manejó; si fue en la carta, avanzar
+    if(!ghostOverlay.classList.contains('hidden')){
+      // no interferir si se clickeó el diálogo para skip -> ese ya maneja
+      if(e.target!==cardNext){
+        // si botón aún deshabilitado, saltar tipeo; si habilitado, avanzar
+        if(cardNext.disabled) cardDialog.click();
+        else advanceGhost();
+      }
+    }
+  });
+  // Click en el overlay de fondo también avanza
+  ghostOverlay.addEventListener('click', (e)=>{
+    if(e.target===ghostOverlay && !ghostOverlay.classList.contains('hidden')){
+      if(cardNext.disabled) cardDialog.click();
+      else advanceGhost();
+    }
+  });
+  // Teclado: Enter / Espacio / Flecha derecha avanza
+  window.addEventListener('keydown', (e)=>{
+    if(ghostOverlay.classList.contains('hidden')) return;
+    if(e.key==='Enter' || e.key===' ' || e.key==='ArrowRight'){
+      e.preventDefault();
+      if(cardNext.disabled) cardDialog.click();
+      else advanceGhost();
     }
   });
   function hideGhost(){

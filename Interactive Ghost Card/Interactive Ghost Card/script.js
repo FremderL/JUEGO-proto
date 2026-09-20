@@ -44,7 +44,7 @@ var options = {
 };
 
 var gui = new dat.GUI();
-
+try{ gui.hide(); if(gui.domElement) gui.domElement.style.display='none'; }catch(e){}
 var bloom = gui.addFolder("Bloom");
 bloom.add(options, "bloomStrength", 0.0, 5.0).name("bloomStrength").listen();
 bloom.add(options, "bloomRadius", 0.1, 2.0).name("bloomRadius").listen();
@@ -57,8 +57,10 @@ color.open();
 var isanim = gui.addFolder("Animate");
 isanim.add(options, "isanimate").name("Animate");
 isanim.open();
-
-gui.close()
+gui.close();
+try{ gui.hide(); if(gui.domElement) gui.domElement.style.display='none'; }catch(e){}
+// Ocultar completamente el botón de controles
+setTimeout(()=>{ try{ document.querySelectorAll('.dg').forEach(el=> el.style.display='none'); }catch(e){} }, 100);
 const vert = `
   varying vec2 vUv;
   varying vec3 camPos;
@@ -492,7 +494,30 @@ function loadskull() {
   modelgroup.add(eye);
   modelgroup.add(eye2);
   var objloader = new OBJLoader();
+  function addFallbackSkull(){
+    // Fallback si el .obj externo falla (CORS/offline) — crear calavera simple para que siempre aparezca
+    try{
+      var geo = new THREE.SphereGeometry(4.2, 24, 18);
+      // deformar ligeramente para forma calavera
+      var fallback = new THREE.Mesh(geo, skullmaterial);
+      fallback.position.set(0, 0.6, -10);
+      fallback.scale.set(1.15, 1.35, 1.05);
+      // mandíbula
+      var jawGeo = new THREE.BoxGeometry(4.2, 1.6, 3.2);
+      var jaw = new THREE.Mesh(jawGeo, skullmaterial);
+      jaw.position.set(0, -3.2, -9.2);
+      var group = new THREE.Group();
+      group.add(fallback); group.add(jaw);
+      group.scale.set(8,8,8);
+      modelgroup.add(group);
+      sceneRTT.add(modelgroup);
+      console.log("Fallback skull added");
+    }catch(e){ console.error("Fallback failed", e); sceneRTT.add(modelgroup); }
+  }
+  // Asegurar que el grupo base con ojos siempre se añada aunque falle el modelo
+  let skullLoaded = false;
   objloader.load(skullmodel, function (object) {
+    skullLoaded = true;
     var mesh2 = object.clone();
     mesh2.position.set(0, 0, -10);
     mesh2.rotation.set(Math.PI, 0, Math.PI);
@@ -515,7 +540,14 @@ function loadskull() {
       modelgroup.add(mesh2);
       sceneRTT.add(modelgroup);
     });
+  }, undefined, function(err){
+    console.warn("Skull model failed, using fallback", err);
+    if(!skullLoaded) addFallbackSkull();
   });
+  // Si en 2.5s no cargó, forzar fallback (asegura calavera siempre visible)
+  setTimeout(()=>{ if(!skullLoaded && modelgroup.children.length<=2) { console.warn("Skull timeout fallback"); addFallbackSkull(); } }, 2500);
+  // Añadir ojos al sceneRTT inmediatamente por si el modelo tarda
+  sceneRTT.add(modelgroup);
 }
 var matrix = new THREE.Matrix4();
 var period = 5;

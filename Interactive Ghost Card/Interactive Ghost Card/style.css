@@ -6,8 +6,6 @@
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-/*       background: black; */
-/*       text-align: center; */
       outline: none;
     }
 
@@ -21,4 +19,10 @@
 canvas {
 	left: calc(50% - 325px);
   position: absolute;
+}
+/* Ocultar controles dat.gui — pedido usuario */
+.dg.ac, .dg.main, .dg {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }

@@ -64,6 +64,31 @@
             <span class="card-title" id="cardTitle">Entre el velo y la nada</span>
             <div class="card-gems"><span class="gem"></span><span class="gem"></span><span class="gem"></span></div>
           </div>
+          <!-- Calavera central — fallback asegurado + iframe Three.js de fondo -->
+          <div class="card-art">
+            <div class="skull-wrap" id="skullWrap">
+              <svg class="skull-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                  <radialGradient id="g1" cx="50%" cy="40%" r="60%">
+                    <stop offset="0%" stop-color="#E9A6FF" stop-opacity="0.95"/>
+                    <stop offset="45%" stop-color="#C551F5" stop-opacity="0.9"/>
+                    <stop offset="100%" stop-color="#3A0A6A" stop-opacity="1"/>
+                  </radialGradient>
+                </defs>
+                <ellipse cx="100" cy="98" rx="54" ry="60" fill="url(#g1)" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+                <ellipse cx="81" cy="96" rx="15" ry="19" fill="#020205" stroke="#00E5FF" stroke-width="1.3" opacity="0.95"/>
+                <ellipse cx="119" cy="96" rx="15" ry="19" fill="#020205" stroke="#00E5FF" stroke-width="1.3" opacity="0.95"/>
+                <circle cx="81" cy="97" r="4.8" fill="#00E5FF" opacity="0.98" style="filter:drop-shadow(0 0 7px #00E5FF)"/>
+                <circle cx="119" cy="97" r="4.8" fill="#00E5FF" opacity="0.98" style="filter:drop-shadow(0 0 7px #00E5FF)"/>
+                <path d="M100 108 L93.5 124 L106.5 124 Z" fill="#020205" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+                <rect x="76" y="129" width="48" height="15" rx="3" fill="#0a0a0f" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+                <line x1="88" y1="129" x2="88" y2="144" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                <line x1="100" y1="129" x2="100" y2="144" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                <line x1="112" y1="129" x2="112" y2="144" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                <ellipse cx="100" cy="98" rx="68" ry="74" stroke="rgba(197,81,245,0.18)" stroke-width="1" fill="none" stroke-dasharray="5 7"/>
+              </svg>
+            </div>
+          </div>
           <div class="card-text">
             <div class="card-dialog" id="cardDialog">...</div>
             <button class="card-next" id="cardNext">Continuar →</button>
