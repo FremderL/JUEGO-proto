@@ -109,10 +109,26 @@ canvas{ display:block; }
 .menu-footer span{ display:flex; align-items:center; gap:6px; }
 .dot{ width:6px; height:6px; border-radius:50%; background:var(--crimson); box-shadow:0 0 6px var(--crimson); display:inline-block; }
 
-/* HEART INTRO */
+/* HEART INTRO — iframe original directo */
 #heartIntro{
   position:fixed; inset:0; z-index:45; background:#000;
   display:flex; align-items:center; justify-content:center; flex-direction:column;
+  overflow:hidden;
+}
+#heartFrame{
+  position:absolute; inset:0; width:100%; height:100%; border:none;
+  filter: contrast(1.05) brightness(1.02);
+  transition: transform 1.6s cubic-bezier(.6,0,.2,1), opacity 1s;
+  transform-origin:center center;
+}
+#heartFrame.shrink{ transform:scale(0.08); opacity:0.45; }
+#heartFrame.beat{ animation: heartBeatFrame 0.6s ease; }
+@keyframes heartBeatFrame{ 0%{ transform:scale(1); } 30%{ transform:scale(1.08); } 60%{ transform:scale(0.96); } 100%{ transform:scale(1); } }
+.heart-file-label{
+  position:absolute; bottom:26px; left:26px; z-index:3;
+  font-family:'JetBrains Mono', monospace; font-size:9px; letter-spacing:0.12em;
+  color:rgba(255,255,255,0.32); background:rgba(0,0,0,0.45); padding:6px 10px; border-radius:4px;
+  border:1px solid rgba(255,255,255,0.08);
 }
 #heartCanvas{ position:absolute; inset:0; width:100%; height:100%; }
 .heart-text{
@@ -138,12 +154,48 @@ canvas{ display:block; }
 }
 .heart-skip:hover{ color:#fff; border-color:rgba(255,255,255,0.3); }
 
-/* GHOST CARD */
+/* GHOST CARD — iframe original directo */
 #ghostOverlay{
   position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center;
   background:radial-gradient(ellipse at center, rgba(10,10,14,0.85) 0%, rgba(0,0,0,0.96) 75%);
   backdrop-filter:blur(8px);
   padding:20px;
+  overflow:hidden;
+}
+#ghostFrame{
+  position:absolute; inset:0; width:100%; height:100%; border:none;
+  opacity:0.92; filter: contrast(1.05) saturate(1.1);
+}
+.ghost-dialog-layer{
+  position:relative; z-index:2; width:min(420px, 92vw); display:flex; flex-direction:column; align-items:center;
+  pointer-events:none;
+}
+.ghost-dialog-layer .ghost-card-wrap{ pointer-events:auto; }
+.ghost-file-label{
+  margin-top:12px; font-family:'JetBrains Mono', monospace; font-size:9px; letter-spacing:0.1em;
+  color:rgba(255,255,255,0.38); background:rgba(0,0,0,0.5); padding:6px 10px; border-radius:4px;
+  border:1px solid rgba(255,255,255,0.08); pointer-events:none;
+}
+#enemyPreview{
+  position:fixed; inset:0; z-index:34; background:rgba(0,0,0,0.88); backdrop-filter:blur(6px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;
+}
+#enemyFrame{
+  width:min(860px, 96vw); height:min(520px, 62vh); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; overflow:hidden; background:#000; box-shadow:0 20px 60px rgba(0,0,0,0.7);
+}
+.enemy-preview-label{
+  font-family:'Cinzel', serif; font-size:11px; letter-spacing:0.24em; text-transform:uppercase;
+  color:rgba(255,255,255,0.55); margin-bottom:10px;
+}
+.enemy-preview-caption{
+  margin-top:10px; font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
+  color:rgba(255,255,255,0.62); background:rgba(255,255,255,0.06); padding:8px 14px; border-radius:20px;
+  border:1px solid rgba(255,255,255,0.08);
+}
+.wave-file-hint{
+  margin-top:6px; font-family:'JetBrains Mono', monospace; font-size:9px; letter-spacing:0.14em;
+  color:rgba(255,255,255,0.38); text-transform:uppercase;
 }
 .ghost-card-wrap{
   position:relative; width:min(420px, 92vw); aspect-ratio:3/4.4;

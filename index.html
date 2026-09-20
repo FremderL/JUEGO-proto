@@ -27,6 +27,9 @@
       <p style="margin-top:14px; font-family:'JetBrains Mono',monospace; font-size:10px; color:rgba(255,255,255,0.32); letter-spacing:0.1em;">
         W A S D / Flechas para moverte · Ratón para apuntar · Click para disparar · R recargar · E curarte
       </p>
+      <p style="margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:9px; color:rgba(255,255,255,0.22);">
+        Recursos originales integrados directamente: Heart, Ghost Card, Spider, Reptile, Dragon
+      </p>
     </div>
     <div class="menu-footer">
       <span><i class="dot"></i> HEART SYSTEM</span>
@@ -37,63 +40,47 @@
     </div>
   </div>
 
-  <!-- HEART INTRO -->
+  <!-- HEART INTRO — DESPLAZAMIENTO DIRECTO AL ARCHIVO ORIGINAL -->
   <div id="heartIntro" class="hidden">
-    <canvas id="heartCanvas"></canvas>
+    <!-- Iframe que carga DIRECTAMENTE Heart Animation/Heart Animation/index.html -->
+    <iframe id="heartFrame" src="Heart%20Animation/Heart%20Animation/index.html" frameborder="0" title="Heart Animation Original"></iframe>
     <div class="heart-text" id="heartText">
       <div class="heart-line" id="heartLine1">Estoy ... ¿vivo?</div>
-      <div class="heart-sub" id="heartSub">escucha tu corazón</div>
+      <div class="heart-sub" id="heartSub">escucha tu corazón — archivo original</div>
     </div>
+    <div class="heart-file-label">Heart Animation / Heart Animation / index.html</div>
     <button class="heart-skip" id="skipHeart">Saltar ›</button>
   </div>
 
-  <!-- GHOST OVERLAY (intro / wave / outro) -->
+  <!-- GHOST OVERLAY — DESPLAZAMIENTO DIRECTO AL ARCHIVO ORIGINAL -->
   <div id="ghostOverlay" class="hidden">
-    <div class="ghost-card-wrap" id="ghostWrap">
-      <div class="ghost-card" id="ghostCard">
-        <div class="card-header">
-          <span class="card-title" id="cardTitle">Entre el velo y la nada</span>
-          <div class="card-gems"><span class="gem"></span><span class="gem"></span><span class="gem"></span></div>
-        </div>
-        <div class="card-art">
-          <div class="skull-wrap">
-            <!-- Stylized skull inline SVG mimicking ghost card bloom -->
-            <svg class="skull-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <radialGradient id="g1" cx="50%" cy="40%" r="60%">
-                  <stop offset="0%" stop-color="#E9A6FF" stop-opacity="0.95"/>
-                  <stop offset="45%" stop-color="#C551F5" stop-opacity="0.9"/>
-                  <stop offset="100%" stop-color="#3A0A6A" stop-opacity="1"/>
-                </radialGradient>
-                <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feComposite in="SourceGraphic" in2="blur" operator="over"/></filter>
-              </defs>
-              <!-- skull shape -->
-              <ellipse cx="100" cy="96" rx="52" ry="58" fill="url(#g1)" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
-              <!-- eye sockets -->
-              <ellipse cx="81" cy="95" rx="14" ry="18" fill="#020205" stroke="#00E5FF" stroke-width="1.2" opacity="0.95"/>
-              <ellipse cx="119" cy="95" rx="14" ry="18" fill="#020205" stroke="#00E5FF" stroke-width="1.2" opacity="0.95"/>
-              <circle cx="81" cy="96" r="4.5" fill="#00E5FF" opacity="0.95" style="filter:drop-shadow(0 0 6px #00E5FF)"/>
-              <circle cx="119" cy="96" r="4.5" fill="#00E5FF" opacity="0.95" style="filter:drop-shadow(0 0 6px #00E5FF)"/>
-              <!-- nasal -->
-              <path d="M100 108 L94 124 L106 124 Z" fill="#020205" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
-              <!-- teeth -->
-              <rect x="78" y="128" width="44" height="14" rx="3" fill="#0a0a0f" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-              <line x1="88" y1="128" x2="88" y2="142" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
-              <line x1="100" y1="128" x2="100" y2="142" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
-              <line x1="112" y1="128" x2="112" y2="142" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
-              <!-- cracks/halo -->
-              <ellipse cx="100" cy="96" rx="64" ry="70" stroke="rgba(197,81,245,0.14)" stroke-width="1" fill="none" stroke-dasharray="4 6"/>
-            </svg>
+    <!-- Iframe que carga DIRECTAMENTE Interactive Ghost Card/Interactive Ghost Card/index.html -->
+    <iframe id="ghostFrame" src="Interactive%20Ghost%20Card/Interactive%20Ghost%20Card/index.html" frameborder="0" title="Ghost Card Original"></iframe>
+    <!-- Dialog overlay encima del iframe original -->
+    <div class="ghost-dialog-layer" id="ghostDialogLayer">
+      <div class="ghost-card-wrap" id="ghostWrap">
+        <div class="ghost-card" id="ghostCard">
+          <div class="card-header">
+            <span class="card-title" id="cardTitle">Entre el velo y la nada</span>
+            <div class="card-gems"><span class="gem"></span><span class="gem"></span><span class="gem"></span></div>
           </div>
+          <div class="card-text">
+            <div class="card-dialog" id="cardDialog">...</div>
+            <button class="card-next" id="cardNext">Continuar →</button>
+          </div>
+          <div class="card-progress" id="cardProgress"></div>
+          <div class="crack-overlay" id="crackOverlay"></div>
         </div>
-        <div class="card-text">
-          <div class="card-dialog" id="cardDialog">...</div>
-          <button class="card-next" id="cardNext">Continuar →</button>
-        </div>
-        <div class="card-progress" id="cardProgress"></div>
-        <div class="crack-overlay" id="crackOverlay"></div>
       </div>
+      <div class="ghost-file-label">Interactive Ghost Card / index.html — Three.js original</div>
     </div>
+  </div>
+
+  <!-- ENEMY PREVIEW — Desplazamiento a archivos de enemigos por oleada -->
+  <div id="enemyPreview" class="hidden">
+    <div class="enemy-preview-label" id="enemyPreviewLabel">Vista previa del enemigo original</div>
+    <iframe id="enemyFrame" frameborder="0"></iframe>
+    <div class="enemy-preview-caption" id="enemyPreviewCaption">Spider — Interactive Spider Cursor original</div>
   </div>
 
   <!-- GAME -->
@@ -106,6 +93,7 @@
         <div class="wave-label">Oleada</div>
         <div class="wave-number" id="waveNumber">1</div>
         <div class="wave-enemies" id="waveEnemies">8 × Arañas</div>
+        <div class="wave-file-hint" id="waveFileHint">Interactive Spider Cursor</div>
       </div>
     </div>
     <div id="hud">
@@ -139,6 +127,7 @@
         <div class="controls-hint">
           <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Mouse</kbd> apuntar</div>
           <div><kbd>Click</kbd> disparar · <kbd>R</kbd> recargar · <kbd>E</kbd> curar · <kbd>P</kbd> pausa</div>
+          <div style="margin-top:4px; font-size:8px; opacity:0.6;">Enemigos = código original + hitbox + IA</div>
         </div>
         <div class="action-buttons">
           <div class="btn-wrap">

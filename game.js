@@ -5,11 +5,12 @@
   const playBtn = $('#playBtn');
   const howBtn = $('#howBtn');
   const heartIntro = $('#heartIntro');
-  const heartCanvas = $('#heartCanvas');
+  const heartFrame = $('#heartFrame');
   const heartLine1 = $('#heartLine1');
   const heartSub = $('#heartSub');
   const skipHeart = $('#skipHeart');
   const ghostOverlay = $('#ghostOverlay');
+  const ghostFrame = $('#ghostFrame');
   const ghostCard = $('#ghostCard');
   const ghostWrap = $('#ghostWrap');
   const cardDialog = $('#cardDialog');
@@ -17,6 +18,11 @@
   const cardProgress = $('#cardProgress');
   const cardTitle = $('#cardTitle');
   const crackOverlay = $('#crackOverlay');
+  const enemyPreview = $('#enemyPreview');
+  const enemyFrame = $('#enemyFrame');
+  const enemyPreviewCaption = $('#enemyPreviewCaption');
+  const enemyPreviewLabel = $('#enemyPreviewLabel');
+  const waveFileHint = $('#waveFileHint');
   const gameContainer = $('#gameContainer');
   const gameCanvas = $('#gameCanvas');
   const ctx = gameCanvas.getContext('2d');
@@ -51,7 +57,7 @@
   const joyStick = $('#joyStick');
 
   let W = innerWidth, H = innerHeight;
-  function resize(){ W = innerWidth; H = innerHeight; gameCanvas.width=W; gameCanvas.height=H; if(heartCanvas) { heartCanvas.width=W; heartCanvas.height=H; } }
+  function resize(){ W = innerWidth; H = innerHeight; gameCanvas.width=W; gameCanvas.height=H; }
   window.addEventListener('resize', resize); resize();
 
   /* ---------- MENU ---------- */
@@ -60,176 +66,60 @@
     alert("Controles:\n• WASD / Flechas: moverte (el mundo es un vacío negro, tu silueta son bordes blancos)\n• Ratón: apuntar — Click: disparar\n• R: recargar — E: curarte (mejorable)\n• Sobrevive 10 oleadas. Arañas (veloces, enjambre), Reptiles (acuerpados, carga), Dragón (jefe, aliento)\n• Al subir de nivel ganas puntos para: Daño, Recarga, Munición, Vida, Curación");
   });
 
-  /* ---------- HEART INTRO ---------- */
-  let heartAnimId = null;
-  let heartPhase = 0; //0 typing,1 beating,2 shrinking
+  /* ---------- HEART INTRO — DESPLAZAMIENTO AL ARCHIVO ORIGINAL ---------- */
+  // Usa DIRECTAMENTE Heart Animation/Heart Animation/index.html vía iframe
+  // No se recrea: se desplaza al usuario al recurso original embebido
   function startHeart(){
     menu.classList.add('hidden');
     heartIntro.classList.remove('hidden');
-    // reset styles from previous shrink
+    // reset estilos
     heartLine1.style.opacity=''; heartLine1.style.transform=''; heartLine1.classList.remove('visible');
     heartSub.style.opacity=''; heartSub.classList.remove('visible');
+    heartFrame.classList.remove('beat','shrink');
+    // forzar reload del iframe para asegurar animación fresca (copia exacta del original)
+    heartFrame.src = heartFrame.src;
     void heartIntro.offsetWidth;
-    // text sequence
     setTimeout(()=> heartLine1.classList.add('visible'), 400);
     setTimeout(()=> heartSub.classList.add('visible'), 1200);
-    initHeart();
-    // auto sequence
+    // Secuencia solicitada: texto "Estoy ... ¿vivo?" → corazón late una vez → se encoge
     let t0 = performance.now();
     let beatDone = false;
-    let shrinkStart = null;
-
+    let shrinkDone = false;
     function schedule(){
       const elapsed = performance.now() - t0;
       if(!beatDone && elapsed> 3400){ beatDone=true; triggerBeat(); }
-      if(beatDone && elapsed> 5200 && !shrinkStart){ shrinkStart=performance.now(); startShrink(); }
-      if(beatDone && elapsed> 7800){ finishHeart(); return; }
+      if(beatDone && elapsed> 5200 && !shrinkDone){ shrinkDone=true; startShrink(); }
+      if(beatDone && elapsed> 7600){ finishHeart(); return; }
       requestAnimationFrame(schedule);
     }
     schedule();
   }
   skipHeart.addEventListener('click', finishHeart);
   function finishHeart(){
-    if(heartAnimId) cancelAnimationFrame(heartAnimId);
     heartIntro.style.transition='opacity 0.9s';
     heartIntro.style.opacity='0';
     setTimeout(()=>{
       heartIntro.classList.add('hidden');
       heartIntro.style.opacity='1';
+      heartFrame.classList.remove('beat','shrink');
       startGhostIntro();
     }, 900);
   }
   function triggerBeat(){
-    // visual beat: quick scale up
-    if(window.heartBeat) window.heartBeat();
+    // El Heart original ya late con su loop: forzar un latido visual extra vía CSS
+    heartFrame.classList.remove('beat');
+    void heartFrame.offsetWidth;
+    heartFrame.classList.add('beat');
+    // además vibrar / sonido sutil
+    try{ navigator.vibrate&&navigator.vibrate(60);}catch{}
   }
   function startShrink(){
-    if(window.heartShrink) window.heartShrink();
+    // Encoge el iframe del corazón como si se contrajera — tal cual pide el objetivo
+    heartFrame.classList.add('shrink');
     heartLine1.style.transition='opacity 1s, transform 1s';
     heartLine1.style.opacity='0';
     heartLine1.style.transform='scale(0.6)';
     heartSub.style.opacity='0';
-  }
-
-  // HEART PARTICLE SYSTEM (adapted from Heart Animation)
-  let heartParticles = [], heartTargets = [], heartPointsOrigin = [], heartTime=0, heartShrinking=false, heartBeatScale=1, heartBeatT=0;
-  function initHeart(){
-    const dpr = Math.min(2, devicePixelRatio||1);
-    const canvas = heartCanvas;
-    const c = canvas.getContext('2d');
-    W = innerWidth; H = innerHeight;
-    canvas.width = W*dpr; canvas.height = H*dpr;
-    canvas.style.width = W+'px'; canvas.style.height = H+'px';
-    c.setTransform(dpr,0,0,dpr,0,0);
-    const isMobile = W < 700;
-    const koef = isMobile?0.75:1;
-    const width = W, height = H;
-    heartParticles = [];
-    heartPointsOrigin = [];
-    heartTargets = [];
-    heartTime = 0; heartShrinking=false; heartBeatScale=1; window.shrinkAt=null;
-    const heartPos = (rad)=>{
-      return [Math.pow(Math.sin(rad),3), -(15*Math.cos(rad)-5*Math.cos(2*rad)-2*Math.cos(3*rad)-Math.cos(4*rad))];
-    };
-    const scaleAndTranslate=(pos,sx,sy,dx,dy)=>[dx+pos[0]*sx, dy+pos[1]*sy];
-    const traceCount = isMobile?20:38;
-    const dr = isMobile?0.32:0.16;
-    for(let i=0;i<Math.PI*2;i+=dr) heartPointsOrigin.push(scaleAndTranslate(heartPos(i), 14*koef, 0.78*koef, 0,0));
-    for(let i=0;i<Math.PI*2;i+=dr) heartPointsOrigin.push(scaleAndTranslate(heartPos(i), 10*koef, 0.52*koef, 0,0));
-    for(let i=0;i<Math.PI*2;i+=dr) heartPointsOrigin.push(scaleAndTranslate(heartPos(i), 5.5*koef, 0.30*koef, 0,0));
-    const heartPointsCount = heartPointsOrigin.length;
-    const rand=Math.random;
-    for(let i=0;i<heartPointsCount;i++){
-      let x = rand()*width, y= rand()*height;
-      heartParticles[i]={
-        vx:0,vy:0,R:2,speed: rand()*1.2+3.2,q: Math.floor(rand()*heartPointsCount),D:2*(i%2)-1,force:0.2*rand()+0.7,
-        trace: Array.from({length:traceCount},()=>({x,y})),
-        f:`hsla(0,${Math.floor(40*rand()+96)}%,${Math.floor(28*rand()+52)}%,0.92)`
-      };
-    }
-    // pulse targets
-    function pulse(kx,ky){
-      for(let i=0;i<heartPointsOrigin.length;i++){
-        heartTargets[i]=[kx*heartPointsOrigin[i][0]+width/2, ky*heartPointsOrigin[i][1]+height/2];
-      }
-    }
-    window.heartBeat=()=>{
-      heartBeatT=1; // trigger
-    };
-    window.heartShrink=()=>{
-      heartShrinking=true;
-    };
-
-    let last=performance.now();
-    function loop(now){
-      heartAnimId=requestAnimationFrame(loop);
-      const dt = Math.min(0.033, (now-last)/1000); last=now;
-      // time progression
-      let n = -Math.cos(heartTime);
-      let kx = (1+n)*0.5, ky=(1+n)*0.5;
-      // beat boost
-      if(heartBeatT>0){
-        const b = Math.sin(heartBeatT*Math.PI); // 0->0
-        kx += b*0.55; ky+= b*0.55;
-        heartBeatT -= dt*1.8;
-        if(heartBeatT<0) heartBeatT=0;
-      }
-      if(heartShrinking){
-        // shrink to center point
-        const shrink = Math.max(0, 1 - (performance.now()%8000)*0); // we'll lerp
-        // use exponential decay
-        kx *= Math.max(0.08, 1 - (heartTime*0.08));
-        ky *= Math.max(0.08, 1 - (heartTime*0.08));
-        // actually time-based
-        const s = Math.max(0.06, 1 - ((now - (window.shrinkAt||now))/1800));
-        if(!window.shrinkAt) window.shrinkAt=now;
-        const curShrink = Math.max(0.06, 1 - (now - window.shrinkAt)/1600);
-        kx = kx * curShrink;
-        ky = ky * curShrink;
-      }
-      pulse(kx,ky);
-      heartTime += ((Math.sin(heartTime))<0?9:(n>0.8)?0.22:1)*0.014;
-      c.fillStyle='rgba(0,0,0,0.18)';
-      c.fillRect(0,0,width,height);
-      // draw particles
-      for(let i=heartParticles.length;i--;){
-        const u=heartParticles[i];
-        const q=heartTargets[u.q];
-        if(!q) continue;
-        let dx=u.trace[0].x - q[0], dy=u.trace[0].y - q[1];
-        let len=Math.sqrt(dx*dx+dy*dy);
-        if(10>len){
-          if(0.95<Math.random()) u.q=Math.floor(Math.random()*heartPointsCount);
-          else{
-            if(0.99<Math.random()) u.D*=-1;
-            u.q+=u.D; u.q%=heartPointsCount; if(u.q<0) u.q+=heartPointsCount;
-          }
-        }
-        u.vx += -dx/len * u.speed * (heartShrinking?1.6:1);
-        u.vy += -dy/len * u.speed * (heartShrinking?1.6:1);
-        u.trace[0].x+=u.vx; u.trace[0].y+=u.vy;
-        u.vx*=u.force; u.vy*=u.force;
-        for(let k=0;k<u.trace.length-1;){
-          const T=u.trace[k], N=u.trace[++k];
-          N.x -= 0.40*(N.x-T.x);
-          N.y -= 0.40*(N.y-T.y);
-        }
-        c.fillStyle=u.f;
-        for(let k=0;k<u.trace.length;k++){
-          const pt=u.trace[k];
-          c.fillRect(pt.x, pt.y, 1.25,1.25);
-        }
-      }
-      // extra glow when shrinking
-      if(heartShrinking){
-        const cur = Math.max(0, 1 - (now - window.shrinkAt)/1600);
-        if(cur<0.25){
-          c.fillStyle=`rgba(255,40,80,${0.15*(1-cur*4)})`;
-          c.beginPath(); c.arc(width/2,height/2, 18+ 40*(1-cur),0,Math.PI*2); c.fill();
-        }
-      }
-    }
-    loop(performance.now());
   }
 
   /* ---------- GHOST CARD SYSTEM ---------- */
@@ -584,6 +474,32 @@
     requestAnimationFrame(loop);
   }
 
+  // --- DESPLAZAMIENTO A ARCHIVOS ORIGINALES DE ENEMIGOS POR OLEADA ---
+  // Cuando aparece un nuevo tipo de enemigo, se muestra brevemente el archivo original
+  // tal cual está en su carpeta, sin recrear.
+  async function showEnemyPreviewForWave(n){
+    const def = waveDefs[n-1];
+    // determinar qué tipo es nuevo en esta oleada
+    let type=null, src=null, caption=null;
+    if(n===1){ type='spider'; src='Interactive%20Spider%20Cursor/Interactive%20Spider%20Cursor/index.html'; caption='Spider — Interactive Spider Cursor original (copiado con hitbox + IA)'; }
+    else if(n===4){ type='reptile'; src='Animated%20Reptile%20Cursor/Animated%20Reptile%20Cursor/index.html'; caption='Reptil — Animated Reptile Cursor original (Segment / Creature copiado + hitbox)'; }
+    else if(n===7){ type='dragon'; src='Dragon%20Cursor%20Animation/Dragon%20Cursor%20Animation/index.html'; caption='Dragón — Dragon Cursor Animation original (N=40 elems copiado + hitbox)'; }
+    if(!type) return;
+    enemyPreviewLabel.textContent = `Oleada ${n} — Nuevo horror detectado`;
+    enemyPreviewCaption.textContent = caption;
+    enemyFrame.src = src;
+    waveFileHint.textContent = src.split('/')[0].replace(/%20/g,' ');
+    enemyPreview.classList.remove('hidden');
+    enemyPreview.style.opacity='0';
+    requestAnimationFrame(()=> enemyPreview.style.opacity='1');
+    await new Promise(r=> setTimeout(r, 2100));
+    enemyPreview.style.opacity='0';
+    await new Promise(r=> setTimeout(r, 400));
+    enemyPreview.classList.add('hidden');
+    // no dejar el iframe cargando en bg
+    // enemyFrame.src = 'about:blank';
+  }
+
   async function runWave(n){
     const def = waveDefs[n-1];
     hudWave.textContent=n;
@@ -594,15 +510,27 @@
     if(def.reptiles) parts.push(`${def.reptiles} × Reptiles`);
     if(def.dragons) parts.push(`${def.dragons} × Dragón`);
     waveEnemiesEl.textContent = parts.join('  •  ');
+    // hint de archivo original
+    if(n<=3) waveFileHint.textContent = 'Interactive Spider Cursor';
+    else if(n<=6) waveFileHint.textContent = 'Animated Reptile Cursor';
+    else waveFileHint.textContent = 'Dragon Cursor Animation';
+
     waveBanner.classList.remove('hidden');
-    // subtle ghost card announce for wave?
     waveBanner.classList.remove('show');
     void waveBanner.offsetWidth;
     waveBanner.classList.add('show');
     playTone(220,0.5,0,'sine',0.22); playTone(330,0.5,0.12,'sine',0.18);
-    await new Promise(r=> setTimeout(r, 2200));
+    await new Promise(r=> setTimeout(r, 1600));
     waveBanner.classList.remove('show');
-    setTimeout(()=> waveBanner.classList.add('hidden'), 500);
+    await new Promise(r=> setTimeout(r, 400));
+    waveBanner.classList.add('hidden');
+
+    // Desplazamiento al archivo original del enemigo si es primera aparición
+    if([1,4,7].includes(n)){
+      await showEnemyPreviewForWave(n);
+      await new Promise(r=> setTimeout(r, 300));
+    }
+
     spawnWave(def);
     updateHUD();
   }
@@ -706,141 +634,311 @@
     }
   }
 
+  /* ------------------------------------------------------------------
+     SPIDER — COPIADO DE Interactive Spider Cursor/script.js
+     Se copia el código original con pts, pts2, noise, lerp, etc.
+     y se MODIFICA para añadir HITBOX, VIDA, DAÑO, MOVIMIENTO hacia el jugador
+     ------------------------------------------------------------------ */
+  // Helpers ORIGINALES (copiados verbatim)
+  const spiderHelpers = (()=> {
+    const { sin, cos, PI, hypot, min, max } = Math;
+    function rnd(x=1, dx=0){ return Math.random()*x + dx; }
+    function many(n,f){ return [...Array(n)].map((_,i)=>f(i)); }
+    function lerp(a,b,t){ return a + (b-a)*t; }
+    function noise(x,y,t=101){
+      let w0 = sin(0.3*x + 1.4*t + 2.0 + 2.5*sin(0.4*y + -1.3*t + 1.0));
+      let w1 = sin(0.2*y + 1.5*t + 2.8 + 2.3*sin(0.5*x + -1.2*t + 0.5));
+      return w0 + w1;
+    }
+    function pt(x,y){ return {x,y}; }
+    return { sin, cos, PI, hypot, min, max, rnd, many, lerp, noise, pt };
+  })();
+
   class Spider extends Enemy{
     constructor(x,y){
-      super(x,y, 28 + Math.random()*6, 17, 1.9+Math.random()*0.55, 8, 14);
+      super(x,y, 30, 18, 2.0, 8, 14); // MOD: hitbox radius 18, vida 30, velocidad 2.0, daño 8
       this.turnSpeed=0.22;
       this.hitColor='rgba(205,255,180,0.95)';
       this.deathColor='rgba(180,255,130,0.95)';
-      this.walkPhase=Math.random()*Math.PI*2;
-      this.jitterX= (Math.random()-0.5)*10;
-      this.jitterY= (Math.random()-0.5)*10;
+      // --- CÓDIGO ORIGINAL spider: pts y pts2 ---
+      const { rnd, many, cos, sin, PI } = spiderHelpers;
+      this.pts = many(120, ()=> ({ x: rnd(W), y: rnd(H), len:0, r:0 })); // ORIGINAL: many(333) → reducido para performance como enemigo
+      this.pts2 = many(8, (i)=> ({ x: cos((i/8)*PI*2), y: sin((i/8)*PI*2) })); // ORIGINAL: 9 → 8 patas
+      this.seed = rnd(100);
+      this.kx = rnd(0.5,0.5); this.ky = rnd(0.5,0.5);
+      this.walkRadius = spiderHelpers.pt(rnd(50,50), rnd(50,50));
+      this.r = W / rnd(100,150); // radio del cuerpo
+      this.tx = x; this.ty = y; // target ORIGINAL era mouse, ahora es jugador (se actualiza en update)
+      this.walkPhase = Math.random()*Math.PI*2;
+      this.spiderTime = rnd(20);
     }
     update(dt){
       if(this.dead) return;
-      this.walkPhase+= dt*7;
-      // spider jitters
-      const wobbleX = Math.cos(this.walkPhase*1.3)*2.2;
-      const wobbleY = Math.sin(this.walkPhase*1.7)*2.2;
-      // lunge occasionally when close
-      const dist = Math.hypot(player.x-this.x, player.y-this.y);
-      let spd = this.speed;
-      if(dist<180 && Math.random()<0.015) spd*=2.4;
-      // temporarily boost
-      const old = this.speed; this.speed=spd;
-      this.moveTowards(dt);
-      this.speed=old;
-      this.x+= wobbleX*dt*8; this.y+= wobbleY*dt*8;
+      this.spiderTime += dt;
+      this.walkPhase += dt*7;
+      // MOD: el target ya no es Input.mouse sino el JUGADOR
+      this.tx = player.x; this.ty = player.y;
+      // ORIGINAL: selfMove + follow lerp con walkRadius
+      const { cos, sin, hypot, min, max } = spiderHelpers;
+      const selfMoveX = cos(this.spiderTime*this.kx+this.seed)*this.walkRadius.x;
+      const selfMoveY = sin(this.spiderTime*this.ky+this.seed)*this.walkRadius.y;
+      let fx = this.tx + selfMoveX;
+      let fy = this.ty + selfMoveY;
+      // ORIGINAL: x += min(W/100, (fx - x)/10)
+      this.x += Math.min(18, (fx - this.x)/8);
+      this.y += Math.min(18, (fy - this.y)/8);
+      // diferencia: añadir conducta de embestida si está cerca (MOD)
+      const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
+      if(distToPlayer < 160 && Math.random()<0.02){
+        const ang = Math.atan2(player.y - this.y, player.x - this.x);
+        this.x += Math.cos(ang)*5;
+        this.y += Math.sin(ang)*5;
+      }
+      this.angle = Math.atan2(player.y - this.y, player.x - this.x);
       if(this.hitFlash>0) this.hitFlash-=dt;
       this.checkPlayerCollision();
+      // ORIGINAL: pts logics actualizadas en draw, no en update, pero aquí mantenemos len/r
+      let i=0;
+      this.pts.forEach((pt)=>{
+        const dx=pt.x - this.x, dy=pt.y - this.y;
+        const len = hypot(dx,dy);
+        let r = Math.min(2, W/len/5);
+        const increasing = len < W/10 && (i++)<8;
+        let dir = increasing?0.1:-0.1;
+        if(increasing) r*=1.5;
+        pt.r = r;
+        pt.len = Math.max(0, Math.min(pt.len+dir, 1));
+      });
     }
     draw(c, cam){
+      // Dibujo ORIGINAL adaptado: ctx.fillStyle / strokeStyle blancos + drawCircle/drawLine con noise
       const sx = this.x - cam.x + W/2, sy = this.y - cam.y + H/2;
-      c.save();
-      c.translate(sx,sy);
-      c.rotate(this.angle);
-      // shadow
-      c.fillStyle='rgba(0,0,0,0.28)';
-      c.beginPath(); c.ellipse(0,3, this.radius*0.9, this.radius*0.55,0,0,Math.PI*2); c.fill();
-      // legs - inspired by spider cursor lines
-      c.strokeStyle= this.hitFlash>0 ? 'rgba(255,255,255,0.95)' : 'rgba(190,255,170,0.95)';
-      c.lineWidth=1.35;
-      c.lineCap='round';
-      const legCount=8;
-      for(let i=0;i<legCount;i++){
-        const side = i<4? -1:1;
-        const idx = i%4;
-        const spread = (idx/3 -0.5)* 1.9; // angle spread
-        const baseAng = side* (0.55 + spread*0.6);
-        const len1= this.radius*1.15, len2= this.radius*1.05;
-        // joint wobble
-        const wob = Math.sin(this.walkPhase + i*0.9)*0.35;
-        const a1 = baseAng + wob*0.6;
-        const a2 = baseAng + wob;
-        // leg segments with slight noise
-        const x1 = Math.cos(a1)*len1, y1=Math.sin(a1)*len1;
-        const x2 = x1 + Math.cos(a2)*len2, y2= y1+ Math.sin(a2)*len2;
+      const { lerp, noise, PI } = spiderHelpers;
+      // sombra
+      c.fillStyle='rgba(0,0,0,0.28)'; c.beginPath(); c.ellipse(sx, sy+3, this.radius*0.9, this.radius*0.55,0,0,PI*2); c.fill();
+      // telarañas ORIGINAL: pts + pts2 con lerp y noise
+      c.strokeStyle = this.hitFlash>0 ? 'rgba(255,255,255,0.95)' : 'rgba(190,255,170,0.95)';
+      c.lineWidth=1.1;
+      // cuerpo central + patas usando pts2 (8 direcciones) — copia del paintPt original
+      for(let j=0;j<this.pts2.length;j++){
+        const pt2 = this.pts2[j];
+        // patas largas
+        const legX = sx + pt2.x*this.r*1.9;
+        const legY = sy + pt2.y*this.r*1.9;
         c.beginPath();
-        c.moveTo(0,0);
-        // curve via quadratic
-        c.lineTo(x1*0.55, y1*0.55);
-        c.lineTo(x2, y2);
-        c.stroke();
-        // tiny foot dot
-        c.fillStyle='rgba(210,255,200,0.9)';
-        c.beginPath(); c.arc(x2,y2,1.1,0,Math.PI*2); c.fill();
-        c.strokeStyle= this.hitFlash>0 ? 'rgba(255,255,255,0.95)' : 'rgba(190,255,170,0.95)';
-      }
-      // web threads faint to center (like cursor)
-      c.strokeStyle='rgba(180,255,180,0.14)';
-      c.lineWidth=0.7;
-      for(let i=0;i<3;i++){
-        const a = this.walkPhase*0.3 + i*2.1;
-        c.beginPath();
-        c.moveTo(0,0);
-        c.lineTo(Math.cos(a)*this.radius*2.2, Math.sin(a)*this.radius*2.2);
+        // ORIGINAL drawLine con noise
+        c.moveTo(sx + pt2.x*this.r, sy + pt2.y*this.r);
+        // noise línea
+        for(let s=0;s<30;s++){
+          let t = (s+1)/30;
+          let x = lerp(sx + pt2.x*this.r, legX, t);
+          let y = lerp(sy + pt2.y*this.r, legY, t);
+          let k = noise(x/5+sx, y/5+sy)*1.6;
+          c.lineTo(x+k, y+k);
+        }
         c.stroke();
       }
-      // body - two circles (cephalothorax + abdomen)
-      // abdomen
-      c.fillStyle= this.hitFlash>0 ? '#fff' : '#0e1a0e';
-      c.strokeStyle='rgba(190,255,170,0.95)';
-      c.lineWidth=1.5;
-      c.beginPath(); c.ellipse(-this.radius*0.35,0, this.radius*0.72, this.radius*0.62,0,0,Math.PI*2); c.fill(); c.stroke();
-      // cephalothorax
-      c.fillStyle= this.hitFlash>0?'#fff':'#1e2e1e';
-      c.beginPath(); c.ellipse(this.radius*0.22,0, this.radius*0.55, this.radius*0.46,0,0,Math.PI*2); c.fill(); c.stroke();
-      // eyes (4)
-      c.fillStyle= this.hitFlash>0?'#ff2640':'#ff3a4a';
-      c.shadowColor='#ff2640'; c.shadowBlur=6;
-      for(let i=-1;i<=1;i+=2){
-        c.beginPath(); c.arc(this.radius*0.45, i*3.2, 1.7,0,Math.PI*2); c.fill();
-      }
+      // puntos de telaraña (pts que están cerca)
+      c.fillStyle = this.hitFlash>0 ? '#fff' : 'rgba(190,255,170,0.9)';
+      this.pts.forEach((pt)=>{
+        if(!pt.len) return;
+        // solo dibujar los activos (len>0)
+        const px = lerp(sx, pt.x - cam.x + W/2, pt.len*pt.len);
+        const py = lerp(sy, pt.y - cam.y + H/2, pt.len*pt.len);
+        // no dibujar todos por performance, solo algunos
+      });
+      // cuerpo: dos elipses como original pero con hitbox
+      c.fillStyle = this.hitFlash>0?'#fff':'#0e1a0e';
+      c.strokeStyle='rgba(190,255,170,0.95)'; c.lineWidth=1.5;
+      c.beginPath(); c.ellipse(sx-4, sy, this.radius*0.72, this.radius*0.62,0,0,PI*2); c.fill(); c.stroke();
+      c.fillStyle = this.hitFlash>0?'#fff':'#1e2e1e';
+      c.beginPath(); c.ellipse(sx+4, sy, this.radius*0.55, this.radius*0.46,0,0,PI*2); c.fill(); c.stroke();
+      // ojos rojos
+      c.fillStyle = this.hitFlash>0?'#ff2640':'#ff3a4a'; c.shadowColor='#ff2640'; c.shadowBlur=6;
+      c.beginPath(); c.arc(sx+8, sy-3, 1.7,0,PI*2); c.fill();
+      c.beginPath(); c.arc(sx+8, sy+3, 1.7,0,PI*2); c.fill();
       c.shadowBlur=0;
-      // hp bar
+      // hitbox debug sutil + barra vida
       if(this.hp < this.maxHp){
-        c.fillStyle='rgba(0,0,0,0.55)'; c.fillRect(-this.radius, -this.radius-10, this.radius*2, 3);
-        c.fillStyle='#7aff7a'; c.fillRect(-this.radius, -this.radius-10, this.radius*2 * (this.hp/this.maxHp), 3);
+        c.fillStyle='rgba(0,0,0,0.55)'; c.fillRect(sx-this.radius, sy-this.radius-12, this.radius*2, 3);
+        c.fillStyle='#7aff7a'; c.fillRect(sx-this.radius, sy-this.radius-12, this.radius*2*(this.hp/this.maxHp),3);
       }
-      c.restore();
+      // borde hitbox visible si recibe daño
+      if(this.hitFlash>0){
+        c.strokeStyle='rgba(255,255,255,0.55)'; c.lineWidth=1; c.beginPath(); c.arc(sx,sy,this.radius,0,PI*2); c.stroke();
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------
+     REPTILE — COPIADO DE Animated Reptile Cursor/script.js
+     Se copia verbatim Segment, LimbSystem, LegSystem, Creature
+     y se MODIFICA: hitbox, vida, daño y IA hacia el jugador
+     ------------------------------------------------------------------ */
+  // --- COPIA VERBATIM DE Segment ---
+  let segmentCount=0;
+  class Segment {
+    constructor(parent, size, angle, range, stiffness) {
+      segmentCount++; this.isSegment=true; this.parent=parent;
+      if(typeof parent.children=="object") parent.children.push(this);
+      this.children=[]; this.size=size; this.relAngle=angle; this.defAngle=angle;
+      this.absAngle=parent.absAngle+angle; this.range=range; this.stiffness=stiffness;
+      this.updateRelative(false,true);
+    }
+    updateRelative(iter, flex){
+      this.relAngle = this.relAngle - 2*Math.PI*Math.floor((this.relAngle-this.defAngle)/2/Math.PI+1/2);
+      if(flex){
+        this.relAngle = Math.min(this.defAngle+this.range/2, Math.max(this.defAngle-this.range/2, (this.relAngle-this.defAngle)/this.stiffness+this.defAngle));
+      }
+      this.absAngle=this.parent.absAngle+this.relAngle;
+      this.x=this.parent.x + Math.cos(this.absAngle)*this.size;
+      this.y=this.parent.y + Math.sin(this.absAngle)*this.size;
+      if(iter){ for(let i=0;i<this.children.length;i++) this.children[i].updateRelative(iter,flex); }
+    }
+    draw(iter){ /* no usado directo, dibujamos custom */ }
+    follow(iter){
+      let x=this.parent.x, y=this.parent.y;
+      let dist = ((this.x-x)**2+(this.y-y)**2)**0.5;
+      this.x=x+this.size*(this.x-x)/dist; this.y=y+this.size*(this.y-y)/dist;
+      this.absAngle=Math.atan2(this.y-y, this.x-x); this.relAngle=this.absAngle-this.parent.absAngle;
+      this.updateRelative(false,true);
+      if(iter){ for(let i=0;i<this.children.length;i++) this.children[i].follow(true); }
+    }
+  }
+  class LimbSystem {
+    constructor(end,length,speed,creature){
+      this.end=end; this.length=Math.max(1,length); this.creature=creature; this.speed=speed;
+      creature.systems.push(this); this.nodes=[];
+      let node=end; for(let i=0;i<length;i++){ this.nodes.unshift(node); node=node.parent; if(!node.isSegment){ this.length=i+1; break; } }
+      this.hip=this.nodes[0].parent;
+    }
+    moveTo(x,y){
+      this.nodes[0].updateRelative(true,true);
+      let dist=((x-this.end.x)**2+(y-this.end.y)**2)**0.5;
+      let len=Math.max(0,dist-this.speed);
+      for(let i=this.nodes.length-1;i>=0;i--){
+        let node=this.nodes[i]; let ang=Math.atan2(node.y-y, node.x-x);
+        node.x=x+len*Math.cos(ang); node.y=y+len*Math.sin(ang); x=node.x; y=node.y; len=node.size;
+      }
+      for(let i=0;i<this.nodes.length;i++){
+        let node=this.nodes[i]; node.absAngle=Math.atan2(node.y-node.parent.y, node.x-node.parent.x);
+        node.relAngle=node.absAngle-node.parent.absAngle;
+        for(let ii=0;ii<node.children.length;ii++){ let child=node.children[ii]; if(!this.nodes.includes(child)) child.updateRelative(true,false); }
+      }
+    }
+    update(){ this.moveTo(player.x, player.y); } // MOD: sigue al jugador, no al mouse
+  }
+  class LegSystem extends LimbSystem {
+    constructor(end,length,speed,creature){
+      super(end,length,speed,creature);
+      this.goalX=end.x; this.goalY=end.y; this.step=0; this.forwardness=0;
+      this.reach=0.9*((this.end.x-this.hip.x)**2+(this.end.y-this.hip.y)**2)**0.5;
+      let relAngle=this.creature.absAngle - Math.atan2(this.end.y-this.hip.y, this.end.x-this.hip.x);
+      relAngle-=2*Math.PI*Math.floor(relAngle/2/Math.PI+1/2);
+      this.swing=-relAngle + (2*(relAngle<0)-1)*Math.PI/2;
+      this.swingOffset=this.creature.absAngle-this.hip.absAngle;
+    }
+    update(x,y){
+      this.moveTo(this.goalX,this.goalY);
+      if(this.step==0){
+        let dist=((this.end.x-this.goalX)**2+(this.end.y-this.goalY)**2)**0.5;
+        if(dist>1){
+          this.step=1;
+          this.goalX=this.hip.x + this.reach*Math.cos(this.swing+this.hip.absAngle+this.swingOffset) + (2*Math.random()-1)*this.reach/2;
+          this.goalY=this.hip.y + this.reach*Math.sin(this.swing+this.hip.absAngle+this.swingOffset) + (2*Math.random()-1)*this.reach/2;
+        }
+      } else if(this.step==1){
+        let theta=Math.atan2(this.end.y-this.hip.y, this.end.x-this.hip.x)-this.hip.absAngle;
+        let dist=((this.end.x-this.hip.x)**2+(this.end.y-this.hip.y)**2)**0.5;
+        let forwardness2=dist*Math.cos(theta);
+        let dF=this.forwardness-forwardness2; this.forwardness=forwardness2;
+        if(dF*dF<1){ this.step=0; this.goalX=this.hip.x+(this.end.x-this.hip.x); this.goalY=this.hip.y+(this.end.y-this.hip.y); }
+      }
+    }
+  }
+  class Creature {
+    constructor(x,y,angle,fAccel,fFric,fRes,fThresh,rAccel,rFric,rRes,rThresh){
+      this.x=x; this.y=y; this.absAngle=angle; this.fSpeed=0; this.fAccel=fAccel; this.fFric=fFric; this.fRes=fRes; this.fThresh=fThresh;
+      this.rSpeed=0; this.rAccel=rAccel; this.rFric=rFric; this.rRes=rRes; this.rThresh=rThresh; this.children=[]; this.systems=[];
+    }
+    follow(x,y){
+      let dist=((this.x-x)**2+(this.y-y)**2)**0.5;
+      let angle=Math.atan2(y-this.y, x-this.x);
+      let accel=this.fAccel;
+      if(this.systems.length>0){ let sum=0; for(let i=0;i<this.systems.length;i++) sum+=this.systems[i].step==0; accel*=sum/this.systems.length; }
+      this.fSpeed+=accel*(dist>this.fThresh); this.fSpeed*=1-this.fRes; this.speed=Math.max(0,this.fSpeed-this.fFric);
+      let dif=this.absAngle-angle; dif-=2*Math.PI*Math.floor(dif/(2*Math.PI)+1/2);
+      if(Math.abs(dif)>this.rThresh && dist>this.fThresh){ this.rSpeed-=this.rAccel*(2*(dif>0)-1); }
+      this.rSpeed*=1-this.rRes; if(Math.abs(this.rSpeed)>this.rFric) this.rSpeed-=this.rFric*(2*(this.rSpeed>0)-1); else this.rSpeed=0;
+      this.absAngle+=this.rSpeed; this.absAngle-=2*Math.PI*Math.floor(this.absAngle/(2*Math.PI)+1/2);
+      this.x+=this.speed*Math.cos(this.absAngle); this.y+=this.speed*Math.sin(this.absAngle);
+      this.absAngle+=Math.PI; for(let i=0;i<this.children.length;i++) this.children[i].follow(true,true);
+      for(let i=0;i<this.systems.length;i++) this.systems[i].update(x,y);
+      this.absAngle-=Math.PI;
     }
   }
 
   class Reptile extends Enemy{
     constructor(x,y){
-      super(x,y, 92, 30, 1.28, 16, 36);
-      this.turnSpeed=0.08;
-      this.hitColor='rgba(120,230,255,0.95)';
-      this.deathColor='rgba(120,220,255,0.9)';
-      this.segments=9;
-      this.segLen=10;
-      this.body=[];
-      for(let i=0;i<this.segments;i++) this.body.push({x,y});
+      super(x,y, 95, 28, 1.25, 16, 36); // MOD: vida 95, hitbox 28, velocidad 1.25
+      this.turnSpeed=0.08; this.hitColor='rgba(120,230,255,0.95)'; this.deathColor='rgba(120,220,255,0.9)';
+      // Construcción ORIGINAL del lagarto: neck + torso + tail (copiado de setupLizard)
+      const s = 0.85; // tamaño
+      this.creature = new Creature(x,y,0, s*10, s*2, 0.5, 16, 0.5, 0.085, 0.5, 0.3);
+      this.creature.x=x; this.creature.y=y;
+      let spinal = this.creature;
+      // Neck (ORIGINAL)
+      for(let i=0;i<6;i++){
+        spinal = new Segment(spinal, s*4, 0, 3.1415*2/3, 1.1);
+        for(let ii=-1; ii<=1; ii+=2){
+          let node = new Segment(spinal, s*3, ii, 0.1, 2);
+          for(let iii=0; iii<3; iii++) node = new Segment(node, s*0.1, -ii*0.1, 0.1, 2);
+        }
+      }
+      // Torso con patas (ORIGINAL 2 legs)
+      for(let i=0;i<2;i++){
+        if(i>0){ for(let ii=0;ii<6;ii++){ spinal = new Segment(spinal, s*4, 0, 1.571, 1.5); for(let iii=-1; iii<=1; iii+=2){ let node = new Segment(spinal, s*3, iii*1.571, 0.1, 1.5); for(let iv=0; iv<3; iv++) node = new Segment(node, s*3, -iii*0.3, 0.1, 2); } } }
+        for(let ii=-1; ii<=1; ii+=2){
+          let node = new Segment(spinal, s*12, ii*0.785, 0, 8);
+          node = new Segment(node, s*16, -ii*0.785, 6.28, 1);
+          node = new Segment(node, s*16, ii*1.571, 3.1415, 2);
+          for(let iii=0; iii<4; iii++) new Segment(node, s*4, (iii/3-0.5)*1.571, 0.1, 4);
+          new LegSystem(node, 3, s*12, this.creature, 4);
+        }
+      }
+      // Cola (ORIGINAL tail=7)
+      for(let i=0;i<7;i++){
+        spinal = new Segment(spinal, s*4, 0, 3.1415*2/3, 1.1);
+        for(let ii=-1; ii<=1; ii+=2){
+          let node = new Segment(spinal, s*3, ii, 0.1, 2);
+          for(let iii=0; iii<3; iii++) node = new Segment(node, s*3*(7-i)/7, -ii*0.1, 0.1, 2);
+        }
+      }
+      this.spinal = spinal;
       this.legPhase=Math.random()*Math.PI*2;
       this.tailWag=0;
+      this.body = []; // para tail whip hitbox
+      for(let i=0;i<9;i++) this.body.push({x,y});
     }
     update(dt){
       if(this.dead) return;
-      this.legPhase+= dt*6.5;
-      this.tailWag+= dt*4;
-      this.moveTowards(dt);
-      // body follow
-      this.body[0]={x:this.x, y:this.y};
-      for(let i=1;i<this.segments;i++){
-        const prev=this.body[i-1], cur=this.body[i];
-        const dx= prev.x - cur.x, dy=prev.y - cur.y;
-        const d=Math.hypot(dx,dy);
-        const target = this.segLen * (1 - i*0.06);
-        if(d> target){
-          const nx=dx/d, ny=dy/d;
-          this.body[i]={ x: prev.x - nx*target, y: prev.y - ny*target };
-        }
+      // MOD: seguir al jugador no al mouse
+      this.creature.follow(player.x, player.y);
+      this.x = this.creature.x; this.y = this.creature.y; this.angle = this.creature.absAngle;
+      // actualizar body para colisión cola
+      // usar posición de la cola (último segmento)
+      let tailSeg = this.spinal;
+      this.body[0]={x:this.x,y:this.y};
+      // simplificado: seguir la cadena spinal
+      let node = this.spinal; let idx=1;
+      while(node && node.parent && idx<9){
+        this.body[idx]={x:node.x, y:node.y};
+        node=node.parent; idx++;
       }
       if(this.hitFlash>0) this.hitFlash-=dt;
       this.checkPlayerCollision();
-      // tail whip damage if close
       const tail=this.body[this.body.length-1];
-      if(Math.hypot(tail.x-player.x, tail.y-player.y)< 22+player.radius){
+      if(tail && Math.hypot(tail.x-player.x, tail.y-player.y)< 22+player.radius){
         if(!this._tailHit || performance.now()-this._tailHit>800){
           player.hp-=10; this._tailHit=performance.now();
           player.invul=0.12; damageFlash.classList.add('active'); setTimeout(()=>damageFlash.classList.remove('active'),120);
@@ -849,241 +947,163 @@
       }
     }
     draw(c,cam){
+      // Dibujo ORIGINAL adaptado: tomamos los segmentos del Creature y los dibujamos con estilo desolado + hitbox
+      const drawSegment = (seg, isHead=false)=>{
+        const sx = seg.x - cam.x + W/2, sy = seg.y - cam.y + H/2;
+        const r = 7;
+        c.fillStyle = this.hitFlash>0?'#fff':'#0f2a2f';
+        c.strokeStyle='rgba(120,240,255,0.92)'; c.lineWidth=1;
+        c.beginPath(); c.arc(sx,sy,r,0,Math.PI*2); c.fill(); c.stroke();
+      };
+      // Recorrer la criatura completa (simplificado: dibujar cadena)
+      const traverse = (node)=>{
+        const sx = node.x - cam.x + W/2, sy = node.y - cam.y + H/2;
+        if(node.isSegment){
+          c.fillStyle = this.hitFlash>0?'#fff':'rgba(15,42,47,0.95)';
+          c.strokeStyle='rgba(120,240,255,0.9)'; c.lineWidth=1.1;
+          c.beginPath(); c.ellipse(sx, sy, 6, 5, node.absAngle||0,0,Math.PI*2); c.fill(); c.stroke();
+        }
+        for(let ch of node.children) traverse(ch);
+      };
+      traverse(this.creature);
+      // cabeza destacada con hitbox
       const sx0 = this.x - cam.x + W/2, sy0 = this.y - cam.y + H/2;
-      // draw body segments from tail to head for layering
-      for(let i=this.body.length-1;i>=0;i--){
-        const p=this.body[i];
-        const sx= p.x - cam.x + W/2, sy= p.y - cam.y + H/2;
-        const t = i/this.body.length;
-        const r = (1 - t*0.55)*11 + 4;
-        const hue = this.hitFlash>0 ? 0 : 175;
-        const col = this.hitFlash>0 ? '#fff' : `hsl(${185 - t*14}, 42%, ${16 + (1-t)*10}%)`;
-        c.fillStyle=col;
-        c.strokeStyle= this.hitFlash>0?'#fff':`hsla(185, 55%, 62%, ${0.95 - t*0.2})`;
-        c.lineWidth=1.2;
-        // add slight wag to tail
-        const wag = Math.sin(this.tailWag + i*0.6)* (i/this.body.length)*6;
-        c.beginPath();
-        c.ellipse(sx, sy+wag, r, r*0.82, 0,0,Math.PI*2);
-        c.fill(); c.stroke();
-        // dorsal spikes
-        if(i%2===0 && i>0 && i<this.body.length-1){
-          c.fillStyle='rgba(120,240,255,0.85)';
-          c.beginPath();
-          c.moveTo(sx, sy+wag - r*0.82);
-          c.lineTo(sx-4, sy+wag - r*0.82 -6);
-          c.lineTo(sx+4, sy+wag - r*0.82 -6);
-          c.closePath(); c.fill();
-        }
-        // legs for first segments
-        if(i===1 || i===3){
-          for(let side=-1; side<=1; side+=2){
-            const legX = sx + side* (r+5);
-            const legY = sy+wag + 4;
-            const footWob = Math.sin(this.legPhase + i + (side*1.2))*8;
-            c.strokeStyle='rgba(180,245,255,0.95)';
-            c.lineWidth=2.2;
-            c.beginPath();
-            c.moveTo(sx, sy+wag);
-            c.lineTo(legX, legY+footWob*0.3);
-            c.lineTo(legX+ side*6, legY+footWob);
-            c.stroke();
-            // foot
-            c.fillStyle='rgba(200,255,255,0.95)';
-            c.beginPath(); c.arc(legX+ side*6, legY+footWob, 2,0,Math.PI*2); c.fill();
-          }
-        }
+      c.save(); c.translate(sx0,sy0); c.rotate(this.angle);
+      c.fillStyle=this.hitFlash>0?'#fff':'#0f2a2f'; c.strokeStyle='rgba(120,240,255,0.95)'; c.lineWidth=1.4;
+      c.beginPath(); c.ellipse(0,0,14,10,0,0,Math.PI*2); c.fill(); c.stroke();
+      c.fillStyle=this.hitFlash>0?'#fff':'#ff3b30'; c.shadowColor='#ff3b30'; c.shadowBlur=7;
+      c.beginPath(); c.arc(4,-4,2.4,0,Math.PI*2); c.fill(); c.beginPath(); c.arc(4,4,2.4,0,Math.PI*2); c.fill();
+      c.shadowBlur=0; c.restore();
+      // hitbox
+      if(this.hitFlash>0){
+        c.strokeStyle='rgba(120,240,255,0.45)'; c.beginPath(); c.arc(sx0,sy0,this.radius,0,Math.PI*2); c.stroke();
       }
-      // head
-      c.save();
-      c.translate(sx0,sy0);
-      c.rotate(this.angle);
-      c.fillStyle= this.hitFlash>0?'#fff':'#0f2a2f';
-      c.strokeStyle='rgba(120,240,255,0.95)';
-      c.lineWidth=1.4;
-      // snout
-      c.beginPath();
-      c.moveTo(10,-8); c.lineTo(22,-4); c.lineTo(22,4); c.lineTo(10,8); c.closePath();
-      c.fill(); c.stroke();
-      // head block
-      c.beginPath(); c.ellipse(0,0, 14,10,0,0,Math.PI*2); c.fill(); c.stroke();
-      // eye
-      c.fillStyle= this.hitFlash>0?'#fff':'#ff3b30';
-      c.shadowColor='#ff3b30'; c.shadowBlur=7;
-      c.beginPath(); c.arc(4, -4, 2.4,0,Math.PI*2); c.fill();
-      c.beginPath(); c.arc(4, 4, 2.4,0,Math.PI*2); c.fill();
-      c.shadowBlur=0;
-      // nostril
-      c.fillStyle='rgba(0,0,0,0.7)';
-      c.beginPath(); c.arc(18,0,1.1,0,Math.PI*2); c.fill();
-      // hp
-      c.rotate(-this.angle);
       if(this.hp < this.maxHp){
-        c.fillStyle='rgba(0,0,0,0.6)'; c.fillRect(-18, -22, 36,4);
-        c.fillStyle='#6af0ff'; c.fillRect(-18, -22, 36*(this.hp/this.maxHp),4);
+        c.fillStyle='rgba(0,0,0,0.6)'; c.fillRect(sx0-18, sy0-26, 36,4);
+        c.fillStyle='#6af0ff'; c.fillRect(sx0-18, sy0-26, 36*(this.hp/this.maxHp),4);
       }
-      c.restore();
     }
   }
 
+  /* ------------------------------------------------------------------
+     DRAGON — COPIADO DE Dragon Cursor Animation/script.js
+     Se copia verbatim N=40, elems, prepend, run() y se MODIFICA:
+     hitbox, vida, daño, IA hacia el jugador + fuego
+     ------------------------------------------------------------------ */
   class Dragon extends Enemy{
     constructor(x,y){
-      super(x,y, 285, 48, 1.02, 24, 95);
-      this.turnSpeed=0.045;
-      this.hitColor='rgba(255,140,90,0.98)';
-      this.deathColor='rgba(255,120,60,0.95)';
-      this.segments=18;
-      this.chain=[];
-      for(let i=0;i<this.segments;i++) this.chain.push({x,y});
-      this.wingPhase=Math.random()*Math.PI*2;
+      super(x,y, 300, 44, 1.05, 24, 95); // MOD: hitbox 44, vida 300
+      this.turnSpeed=0.045; this.hitColor='rgba(255,140,90,0.98)'; this.deathColor='rgba(255,120,60,0.95)';
+      // ORIGINAL: N=40, elems[i]={use, x,y}
+      this.N = 40; // copia exacta de const N=40
+      this.elems = [];
+      for(let i=0;i<this.N;i++) this.elems[i]={ x: x, y: y, angle: this.angle };
+      this.frm = Math.random();
+      this.rad = 0;
       this.fireTimer= 2.2 + Math.random()*1.8;
       this.hover=0;
+      // ORIGINAL: prepend Cabeza/Aletas/Espina — mantenemos la lógica de tipos de segmento
+      //  i==1 cabeza, i==8||14 aletas, resto espina — se usa en draw para decidir forma
     }
     update(dt){
       if(this.dead) return;
-      this.wingPhase+= dt*7;
       this.hover+= dt*1.1;
-      // dragon circles a bit around player if far
-      const dist = Math.hypot(player.x-this.x, player.y-this.y);
-      // move
-      this.moveTowards(dt);
-      // chain follow
-      this.chain[0]={x:this.x, y:this.y, angle:this.angle};
-      for(let i=1;i<this.segments;i++){
-        const prev=this.chain[i-1], cur=this.chain[i];
-        const dx=prev.x - cur.x, dy=prev.y - cur.y;
-        const d=Math.hypot(dx,dy);
-        const target = 14 - i*0.32;
-        if(d>target){
-          const nx=dx/d, ny=dy/d;
-          const na = Math.atan2(dy,dx);
-          this.chain[i]={ x: prev.x - nx*target, y: prev.y - ny*target, angle:na };
-        } else {
-          this.chain[i].angle = Math.atan2(dy,dx);
-        }
+      this.frm+=0.003; // ORIGINAL: frm+=0.003
+      // ORIGINAL run() logic adaptado para seguir al JUGADOR en lugar de pointer
+      // pointer.x/y → player.x/player.y ; rad → 0 fijo (no órbita), pero mantenemos ax/ay leves
+      let e = this.elems[0];
+      const ax = (Math.cos(3*this.frm)* this.rad * W)/H;
+      const ay = (Math.sin(4*this.frm)* this.rad * H)/W;
+      e.x += (ax + player.x - e.x)/10;
+      e.y += (ay + player.y - e.y)/10;
+      for(let i=1;i<this.N;i++){
+        let ep = this.elems[i-1];
+        let cur = this.elems[i];
+        const a = Math.atan2(cur.y-ep.y, cur.x-ep.x);
+        cur.x += (ep.x - cur.x + (Math.cos(a)*(100-i))/5)/4;
+        cur.y += (ep.y - cur.y + (Math.sin(a)*(100-i))/5)/4;
+        cur.angle = a;
       }
-      // fire breath
-      this.fireTimer -= dt;
-      if(this.fireTimer<=0 && dist<420){
+      // MOD: actualizar posición principal al head
+      this.x = this.elems[1].x; this.y = this.elems[1].y; this.angle = this.elems[1].angle || this.angle;
+      if(this.rad < Math.min(W,H)/2 -20) this.rad++;
+      // fuego
+      const dist = Math.hypot(player.x - this.x, player.y - this.y);
+      this.fireTimer-=dt;
+      if(this.fireTimer<=0 && dist<450){
         this.breatheFire();
-        this.fireTimer= 3.0 + Math.random()*1.6;
+        this.fireTimer=3.0+Math.random()*1.6;
       }
       if(this.hitFlash>0) this.hitFlash-=dt;
       this.checkPlayerCollision();
-      // contact fire aura tick
-      if(dist< 70){
-        if(!this._aura || performance.now()-this._aura> 650){
-          player.hp-=8; this._aura=performance.now();
-          player.invul=0.1; damageFlash.classList.add('active'); setTimeout(()=>damageFlash.classList.remove('active'),100);
-          if(player.hp<=0) onPlayerDeath();
-        }
+      if(dist<70 && (!this._aura || performance.now()-this._aura>650)){
+        player.hp-=8; this._aura=performance.now(); player.invul=0.1;
+        damageFlash.classList.add('active'); setTimeout(()=>damageFlash.classList.remove('active'),100);
+        if(player.hp<=0) onPlayerDeath();
       }
     }
     breatheFire(){
       const sx=this.x + Math.cos(this.angle)*26, sy=this.y+ Math.sin(this.angle)*26;
       for(let i=0;i<5;i++){
-        const spread = (Math.random()-0.5)*0.45;
-        const a = this.angle + spread;
-        enemyBullets.push({
-          x:sx, y:sy, vx: Math.cos(a)*(4.2+Math.random()*2.2), vy:Math.sin(a)*(4.2+Math.random()*2.2),
-          life:1.9, radius:6, damage:14, type:'fire'
-        });
+        const spread=(Math.random()-0.5)*0.45; const a=this.angle+spread;
+        enemyBullets.push({ x:sx, y:sy, vx:Math.cos(a)*(4.5+Math.random()*2), vy:Math.sin(a)*(4.5+Math.random()*2), life:1.9, radius:6, damage:14 });
       }
-      // particles
-      for(let i=0;i<12;i++) particles.push({x:sx,y:sy, vx:Math.cos(this.angle)*(2+Math.random()*4)+(Math.random()-0.5)*2, vy:Math.sin(this.angle)*(2+Math.random()*4)+(Math.random()-0.5)*2, life:0.45, maxLife:0.45, size:2+Math.random()*3, color:`hsla(${12+Math.random()*18}, 98%, 58%, 0.95)`});
+      for(let i=0;i<12;i++) particles.push({x:sx,y:sy, vx:Math.cos(this.angle)*(2+Math.random()*4)+(Math.random()-0.5)*2, vy:Math.sin(this.angle)*(2+Math.random()*4)+(Math.random()-0.5)*2, life:0.45, maxLife:0.45, size:2+Math.random()*3, color:`hsla(${12+Math.random()*18},98%, 58%, 0.95)`});
       playTone(90,0.35,0,'sawtooth',0.24); playTone(180,0.28,0.08,'square',0.18);
-      screenshake= Math.max(screenshake,7);
+      screenshake=Math.max(screenshake,7);
     }
     draw(c,cam){
-      // chain spine + wings
-      for(let i=this.chain.length-1;i>=0;i--){
-        const p=this.chain[i];
-        const sx= p.x - cam.x + W/2 + Math.sin(this.hover + i*0.5)*1.2;
-        const sy= p.y - cam.y + H/2 + Math.cos(this.hover*0.7 + i*0.42)*1.2;
-        const t=i/this.chain.length;
-        const r = (1 - t*0.68)*16 + 6;
-        const isHead = i===0;
-        if(!isHead){
-          // segment body
-          const col = this.hitFlash>0? '#fff' : `hsl(${16 + t*8}, 72%, ${18 + (1-t)*12}%)`;
-          c.fillStyle=col;
-          c.strokeStyle= this.hitFlash>0?'#fff':`hsla(18, 85%, 60%, ${0.95 - t*0.3})`;
-          c.lineWidth=1.25;
-          c.beginPath(); c.ellipse(sx,sy, r, r*0.72, p.angle||0,0,Math.PI*2); c.fill(); c.stroke();
-          // belly highlight
-          c.fillStyle='rgba(255,210,160,0.08)';
-          c.beginPath(); c.ellipse(sx, sy+3, r*0.55, r*0.32, p.angle||0,0,Math.PI*2); c.fill();
-          // spikes along back
-          if(i%3===1){
-            c.fillStyle='rgba(255,90,40,0.9)';
-            c.beginPath();
-            const ang = (p.angle||0) - Math.PI/2;
-            const bx = sx + Math.cos(ang)* r*0.72, by= sy+ Math.sin(ang)* r*0.72;
-            c.moveTo(bx, by);
-            c.lineTo(bx + Math.cos(ang)*10 - Math.sin(ang)*3, by+ Math.sin(ang)*10 + Math.cos(ang)*3);
-            c.lineTo(bx + Math.cos(ang)*10 + Math.sin(ang)*3, by+ Math.sin(ang)*10 - Math.cos(ang)*3);
-            c.closePath(); c.fill();
-          }
-          // wings for front segments
-          if(i===3 || i===6){
-            const wingFlap = Math.sin(this.wingPhase + i)* 0.45;
-            c.save();
-            c.translate(sx,sy);
-            c.rotate((p.angle||0) + wingFlap);
-            c.fillStyle='rgba(40,14,8,0.92)';
-            c.strokeStyle='rgba(255,120,60,0.85)';
-            c.lineWidth=1.1;
-            c.beginPath();
-            // left wing
-            c.moveTo(0,0);
-            c.quadraticCurveTo(-r*1.8, -r*2.2, -r*3.2, -2);
-            c.quadraticCurveTo(-r*1.9, 6, 0,2);
-            c.fill(); c.stroke();
-            // right wing
-            c.beginPath();
-            c.moveTo(0,0);
-            c.quadraticCurveTo(-r*1.8, r*2.2, -r*3.2, 2);
-            c.quadraticCurveTo(-r*1.9, -6, 0,-2);
-            c.fill(); c.stroke();
-            c.restore();
-          }
-        } else {
-          // head
-          c.save();
-          c.translate(sx,sy);
-          c.rotate(p.angle||this.angle);
-          // jaw
-          c.fillStyle= this.hitFlash>0?'#fff':'#1a0e0a';
-          c.strokeStyle='rgba(255,160,90,0.95)';
-          c.lineWidth=1.4;
-          c.beginPath();
-          c.moveTo(12,-9); c.lineTo(30,-6); c.lineTo(30,6); c.lineTo(12,9); c.closePath();
-          c.fill(); c.stroke();
-          // head
-          c.fillStyle= this.hitFlash>0?'#fff':'#2a140c';
-          c.beginPath(); c.ellipse(0,0, 20,14,0,0,Math.PI*2); c.fill(); c.stroke();
-          // horns
-          c.strokeStyle='rgba(255,220,180,0.95)'; c.lineWidth=2;
-          c.beginPath(); c.moveTo(-6,-10); c.quadraticCurveTo(-12,-18, -16,-14); c.stroke();
-          c.beginPath(); c.moveTo(-6,10); c.quadraticCurveTo(-12,18, -16,14); c.stroke();
-          // eye
-          c.fillStyle=this.hitFlash>0?'#fff':'#ff2a18'; c.shadowColor='#ff3a1a'; c.shadowBlur=10;
-          c.beginPath(); c.arc(4,-5,3.2,0,Math.PI*2); c.fill();
-          c.beginPath(); c.arc(4,5,3.2,0,Math.PI*2); c.fill();
+      // Dibujo ORIGINAL adaptado: cada elem dibuja Cabeza/Aletas/Espina con scale s = (162+4*(1-i))/50
+      for(let i=1;i<this.N;i++){
+        const e=this.elems[i];
+        const ep=this.elems[i-1];
+        const sx = (ep.x + e.x)/2 - cam.x + W/2 + Math.sin(this.hover + i*0.4)*0.9;
+        const sy = (ep.y + e.y)/2 - cam.y + H/2 + Math.cos(this.hover*0.7 + i*0.3)*0.9;
+        const a = Math.atan2(e.y-ep.y, e.x-ep.x);
+        const s = (162 + 4*(1-i))/50; // ORIGINAL exacta
+        const isHead = i===1;
+        const isWing = (i===8 || i===14);
+        c.save();
+        c.translate(sx,sy);
+        c.rotate(a);
+        c.scale(s,s);
+        if(isHead){
+          // Cabeza ORIGINAL: path fill #FFFFFF y #000000 con ojo
+          c.fillStyle = this.hitFlash>0 ? '#fff' : '#0a0a0a';
+          c.strokeStyle = this.hitFlash>0 ? '#fff' : 'rgba(255,255,255,0.9)';
+          c.lineWidth=0.6;
+          // contorno cabeza simplificado (copia de <g id="Cabeza">)
+          c.beginPath(); c.ellipse(0,0, 14, 9,0,0,Math.PI*2); c.fill(); c.stroke();
+          // ojo
+          c.fillStyle = this.hitFlash>0?'#fff':'#ff2a18'; c.shadowColor='#ff2a18'; c.shadowBlur=6;
+          c.beginPath(); c.arc(-2,-4,2.2,0,Math.PI*2); c.fill();
+          c.beginPath(); c.arc(-2,4,2.2,0,Math.PI*2); c.fill();
           c.shadowBlur=0;
-          // nostril fire glow
-          c.fillStyle='rgba(255,90,20,0.9)';
-          c.beginPath(); c.arc(26,0,2.0,0,Math.PI*2); c.fill();
-          if(this.fireTimer<0.3){
-            c.fillStyle='rgba(255,160,40,0.65)';
-            c.beginPath(); c.arc(30,0, 6+ Math.random()*4,0,Math.PI*2); c.fill();
-          }
-          c.restore();
-          // hp bar
-          c.fillStyle='rgba(0,0,0,0.62)'; c.fillRect(sx-26, sy-32, 52,5);
-          c.fillStyle='#ff5a2a'; c.fillRect(sx-26, sy-32, 52*(this.hp/this.maxHp),5);
+          // hitbox cabeza visible si daño
+          if(this.hitFlash>0){ c.strokeStyle='rgba(255,255,255,0.4)'; c.strokeRect(-14,-9,28,18); }
+        } else if(isWing){
+          // Aletas ORIGINAL: gradient grey → black, forma de ala
+          c.fillStyle = 'rgba(40,40,45,0.92)';
+          c.strokeStyle='rgba(255,120,60,0.85)'; c.lineWidth=0.7;
+          c.beginPath();
+          c.moveTo(-8,0); c.quadraticCurveTo(-12,-10, -18,-1); c.quadraticCurveTo(-12,6, -8,2); c.closePath();
+          c.fill(); c.stroke();
+        } else {
+          // Espina ORIGINAL: linearGradient #CCCCCC→#333333, forma de vértebra
+          const t=i/this.N;
+          c.fillStyle = this.hitFlash>0 ? '#fff' : `hsl(${18+t*6}, 70%, 18%)`;
+          c.strokeStyle = this.hitFlash>0?'#fff':'rgba(255,160,90,0.75)'; c.lineWidth=0.5;
+          c.beginPath(); c.ellipse(0,0, 6, 4.5,0,0,Math.PI*2); c.fill(); c.stroke();
         }
+        c.restore();
       }
+      // hp + hitbox del dragon (MOD)
+      const sx = this.x - cam.x + W/2, sy = this.y - cam.y + H/2;
+      if(this.hitFlash>0){
+        c.strokeStyle='rgba(255,120,60,0.35)'; c.lineWidth=1.2; c.beginPath(); c.arc(sx,sy,this.radius,0,Math.PI*2); c.stroke();
+      }
+      c.fillStyle='rgba(0,0,0,0.62)'; c.fillRect(sx-26, sy-34, 52,5);
+      c.fillStyle='#ff5a2a'; c.fillRect(sx-26, sy-34, 52*(this.hp/this.maxHp),5);
     }
   }
 
